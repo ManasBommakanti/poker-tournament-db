@@ -8,7 +8,7 @@ import json
 with open(os.path.realpath("../config/secrets.json"), "r") as secrets:
     config = json.load(secrets)
 
-DB_FILE = config["DATABASE_PATH"]
+DB_FILE = config["DATABASE"]["POKER_DB_REL_PATH"]
 
 app = Flask(__name__)
 CORS(app)
@@ -18,13 +18,14 @@ def create_tables():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
 
-    with open(os.path.realpath("db/schema.sql"), "r") as f:
+    with open(os.path.realpath(config["DATABASE"]["SCHEMA_REL_PATH"]), "r") as f:
         c.executescript(f.read())
 
     conn.commit()
     conn.close()
 
 
+# used to test insertions into table
 def test_insertions():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -54,6 +55,28 @@ def get_games():
     games = c.fetchall()
     conn.close()
     return jsonify(games)
+
+
+@app.route("/api/addPlayer", methods=["POST"])
+def add_player():
+    player_data = request.json
+    name = player_data.get("Name")
+    phone_number = player_data.get("PhoneNumber")
+    email = player_data.get("Email")
+    amount = player_data.get("Amount")
+
+    # Insert player data into the database
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO Player (Name, PhoneNumber, Email, WinLossRatio, Amount) 
+                   VALUES (?, ?, ?, ?, ?)""",
+        (name, phone_number, email, 0, amount),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Player added successfully"})
 
 
 # @app.route("/api/course_sections", methods=["GET"])
@@ -88,5 +111,5 @@ def get_games():
 
 if __name__ == "__main__":
     create_tables()
-    test_insertions()
+    # test_insertions()
     app.run(debug=True, port=3001)
