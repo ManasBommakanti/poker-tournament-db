@@ -37,6 +37,7 @@ next-env.d.ts
 
 # backend
 /backend/venv
+/backend/db/poker.db
 
 # config
 /config
