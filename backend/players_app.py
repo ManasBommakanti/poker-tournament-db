@@ -79,6 +79,52 @@ def add_player():
     return jsonify({"message": "Player added successfully"})
 
 
+@app.route("/api/players/<int:player_id>", methods=["PUT"])
+def update_player(player_id):
+    try:
+        player_data = request.json
+        name = player_data["Name"]
+        phone_number = player_data["PhoneNumber"]
+        email = player_data["Email"]
+        amount = player_data["Amount"]
+
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE Player 
+            SET Name=?, PhoneNumber=?, Email=?, Amount=?
+            WHERE PlayerID=?
+        """,
+            (name, phone_number, email, amount, player_id),
+        )
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Player updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/players/<int:player_id>", methods=["DELETE"])
+def delete_player(player_id):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            DELETE FROM Player WHERE PlayerID=?
+        """,
+            (player_id,),
+        )
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Player deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # @app.route("/api/course_sections", methods=["GET"])
 # def get_course_sections():
 #     conn = sqlite3.connect(DB_FILE)

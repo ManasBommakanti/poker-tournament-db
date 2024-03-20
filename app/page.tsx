@@ -29,6 +29,8 @@ export default function Home() {
     WinLossRatio: 0,
     Amount: 0
   });
+  const [editMode, setEditMode] = useState(false);
+  const [editPlayerId, setEditPlayerId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -80,25 +82,65 @@ export default function Home() {
     }));
   }
 
+  // Function to handle submitting the player form (both add and edit)
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:3001/api/addPlayer', newPlayer);
-      setNewPlayer({
-        PlayerID: 0,
-        Name: '',
-        PhoneNumber: '',
-        Email: '',
-        WinLossRatio: 0,
-        Amount: 0
-      });
-      fetchPlayers(); // Refresh player list after adding new player
-      alert('Player added successfully!');
+      if (editMode && editPlayerId) {
+        // If edit mode is enabled, send a PUT request to update the player
+        await axios.put(`http://localhost:3001/api/players/${editPlayerId}`, newPlayer);
+      } else {
+        // If edit mode is not enabled, send a POST request to add a new player
+        await axios.post('http://localhost:3001/api/addPlayer', newPlayer);
+      }
+      // Refresh the players list after adding or editing a player
+      fetchPlayers();
+      // Reset the form fields and edit mode
+      cancelEdit();
     } catch (error) {
-      console.error('Error adding player:', error);
-      alert('An error occurred while adding the player.');
+      console.error('Error:', error);
     }
   }
+  const handleEditPlayer = (player: Player) => {
+    // Set the form fields with the player data being edited
+    setNewPlayer({
+      PlayerID: player.PlayerID,
+      Name: player.Name,
+      PhoneNumber: player.PhoneNumber,
+      Email: player.Email,
+      WinLossRatio: player.WinLossRatio,
+      Amount: player.Amount
+    });
+    setEditMode(true); // Set edit mode to true
+    setEditPlayerId(player.PlayerID); // Set the ID of the player being edited
+  }
+  
+  // Function to handle canceling edit mode
+  const cancelEdit = () => {
+    setEditMode(false); // Reset edit mode
+    setEditPlayerId(null); // Reset player ID
+    setNewPlayer({ // Reset form fields
+      PlayerID: 0,
+      Name: '',
+      PhoneNumber: '',
+      Email: '',
+      WinLossRatio: 0,
+      Amount: 0
+    });
+  }
+  
+  const handleDeletePlayer = async (playerID: number) => {
+    if (window.confirm('Are you sure you want to delete this player?')) {
+      try {
+        await axios.delete(`http://localhost:3001/api/players/${playerID}`);
+        // Refresh the players list after deleting the player
+        fetchPlayers();
+      } catch (error) {
+        console.error('Error deleting player:', error);
+      }
+    }
+  }
+  
 
   return (
     <div className='bg-green-900'>
@@ -109,27 +151,32 @@ export default function Home() {
           <h2 className='text-2xl font-semibold mb-4'>Players</h2>
           <div className='overflow-x-auto rounded-md'>
             <table className='table-auto w-full'>
-              <thead>
-                <tr className='bg-green-800'>
-                  <th className='px-4 py-2'>Name</th>
-                  <th className='px-4 py-2'>ID</th>
-                  <th className='px-4 py-2'>Phone</th>
-                  <th className='px-4 py-2'>Email</th>
-                  <th className='px-4 py-2'>Win/Loss Ratio</th>
-                  <th className='px-4 py-2'>Amount</th>
+            <thead>
+              <tr className='bg-green-800'>
+                <th className='px-4 py-2'>Name</th>
+                <th className='px-4 py-2'>ID</th>
+                <th className='px-4 py-2'>Phone</th>
+                <th className='px-4 py-2'>Email</th>
+                <th className='px-4 py-2'>Win/Loss Ratio</th>
+                <th className='px-4 py-2'>Amount</th>
+                <th className='px-4 py-2'>Actions</th>
+              </tr>
+            </thead>
+            <tbody className='divide-y divide-green-800'>
+              {players.map(player => (
+                <tr key={player.PlayerID}>
+                  <td className='px-4 py-2 text-center'>{player.Name}</td>
+                  <td className='px-4 py-2 text-center'>{player.PlayerID}</td>
+                  <td className='px-4 py-2 text-center'>{player.PhoneNumber}</td>
+                  <td className='px-4 py-2 text-center'>{player.Email}</td>
+                  <td className='px-4 py-2 text-center'>{player.WinLossRatio}</td>
+                  <td className='px-4 py-2 text-center'>${player.Amount}</td>
+                  <td className='px-4 py-2 flex justify-center'>
+                    <button className='mr-2 px-2 py-1 bg-green-600 text-white rounded-md' onClick={() => handleEditPlayer(player)}>Edit</button>
+                    <button className='px-2 py-1 bg-red-600 text-white rounded-md' onClick={() => handleDeletePlayer(player.PlayerID)}>Delete</button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className='divide-y divide-green-800'>
-                {players.map(player => (
-                  <tr key={player.PlayerID}>
-                    <td className='px-4 py-2 text-center'>{player.Name}</td>
-                    <td className='px-4 py-2 text-center'>{player.PlayerID}</td>
-                    <td className='px-4 py-2 text-center'>{player.PhoneNumber}</td>
-                    <td className='px-4 py-2 text-center'>{player.Email}</td>
-                    <td className='px-4 py-2 text-center'>{player.WinLossRatio}</td>
-                    <td className='px-4 py-2 text-center'>${player.Amount}</td>
-                  </tr>
-                ))}
+              ))}
               </tbody>
             </table>
           </div>
@@ -138,8 +185,8 @@ export default function Home() {
       <div className='mx-auto text-white p-4 flex flex-wrap'>
       <div className='w-full lg:w-1/2 lg:pr-40'>
         {/* Player Insertion Form */}
-        <h2 className='text-xl font-semibold mb-4 text-white'>Add New Player</h2>
-        <form onSubmit={handleSubmit}>
+        <h2 className='text-xl font-semibold mb-4 text-white'>{editMode ? 'Edit Player' : 'Add New Player'}</h2>
+        <form autoComplete="off" onSubmit={handleSubmit}>
           <div className='mb-4'>
             <label htmlFor='name' className='text-white'>Full Name:</label>
             <input type='text' id='name' name='Name' value={newPlayer.Name} onChange={handleInputChange} required className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
@@ -156,7 +203,7 @@ export default function Home() {
             <label htmlFor='amount' className='text-white'>Amount (USD):</label>
             <input type='number' id='amount' name='Amount' value={newPlayer.Amount} onChange={handleInputChange} className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
           </div>
-          <button type='submit' className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'>Add Player</button>
+          <button type='submit' className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'>{editMode ? 'Edit Player' : 'Add New Player'}</button>
         </form>
       </div>
       <div className='w-full lg:w-1/2 lg:pl-3'>
