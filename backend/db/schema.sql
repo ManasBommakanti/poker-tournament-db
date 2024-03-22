@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS GameLog;
 CREATE TABLE Player (
     PlayerID INTEGER PRIMARY KEY AUTOINCREMENT,
     Name TEXT NOT NULL,
-    PhoneNumber TEXT,
+    PhoneNumber INTEGER NOT NULL,
     Email TEXT,
     WinLossRatio REAL NOT NULL,
     Amount REAL NOT NULL

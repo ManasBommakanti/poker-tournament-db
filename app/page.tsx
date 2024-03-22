@@ -140,11 +140,19 @@ export default function Home() {
       }
     }
   }
+
+  // Check if the player being edited exists in the player list
+  const editedPlayer = players.find(player => player.PlayerID === editPlayerId);
+
+  // Reset form fields if the player being edited does not exist
+  if (editMode && !editedPlayer) {
+    cancelEdit();
+  }
   
 
   return (
-    <div className='bg-green-900'>
-      <div className='mx-auto text-white p-4'>
+    <div className="flex flex-col h-full">
+      <div className='mx-auto text-white p-4 w-full'>
         <h1 className='text-center text-3xl pt-4'>🃏 Poker Database 🎲</h1>
         <div className='mt-8'>
           {/* Players View */}
@@ -154,19 +162,19 @@ export default function Home() {
             <thead>
               <tr className='bg-green-800'>
                 <th className='px-4 py-2'>Name</th>
-                <th className='px-4 py-2'>ID</th>
+                {/* <th className='px-4 py-2'>ID</th> */}
                 <th className='px-4 py-2'>Phone</th>
                 <th className='px-4 py-2'>Email</th>
                 <th className='px-4 py-2'>Win/Loss Ratio</th>
                 <th className='px-4 py-2'>Amount</th>
-                <th className='px-4 py-2'>Actions</th>
+                <th className='px-4 py-2'></th>
               </tr>
             </thead>
             <tbody className='divide-y divide-green-800'>
               {players.map(player => (
                 <tr key={player.PlayerID}>
                   <td className='px-4 py-2 text-center'>{player.Name}</td>
-                  <td className='px-4 py-2 text-center'>{player.PlayerID}</td>
+                  {/* <td className='px-4 py-2 text-center'>{player.PlayerID}</td> */}
                   <td className='px-4 py-2 text-center'>{player.PhoneNumber}</td>
                   <td className='px-4 py-2 text-center'>{player.Email}</td>
                   <td className='px-4 py-2 text-center'>{player.WinLossRatio}</td>
@@ -182,8 +190,8 @@ export default function Home() {
           </div>
         </div>
       </div>
-      <div className='mx-auto text-white p-4 flex flex-wrap'>
-      <div className='w-full lg:w-1/2 lg:pr-40'>
+      <div className='mx-auto text-white p-4 flex flex-wrap w-full'>
+      <div className='w-full lg:w-1/2 lg:pr'>
         {/* Player Insertion Form */}
         <h2 className='text-xl font-semibold mb-4 text-white'>{editMode ? 'Edit Player' : 'Add New Player'}</h2>
         <form autoComplete="off" onSubmit={handleSubmit}>
@@ -206,8 +214,7 @@ export default function Home() {
           <button type='submit' className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'>{editMode ? 'Edit Player' : 'Add New Player'}</button>
         </form>
       </div>
-      <div className='w-full lg:w-1/2 lg:pl-3'>
-          {/* Games View */}
+        {/* <div className='w-full lg:w-1/2 lg:pl-10'>
           <h2 className='text-2xl font-semibold mb-4'>Games</h2>
           <div className='overflow-x-auto rounded-md'>
             <table className='table-auto w-full'>
@@ -229,8 +236,11 @@ export default function Home() {
               </tbody>
             </table>
           </div>
-        </div>
+        </div> */}
       </div>
+      <footer className="bg-gray-700 text-white text-center py-4 mt-auto">
+        Developed by Manas Bommakanti
+      </footer>
     </div>
   );
 }

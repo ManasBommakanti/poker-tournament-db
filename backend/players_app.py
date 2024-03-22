@@ -125,36 +125,6 @@ def delete_player(player_id):
         return jsonify({"error": str(e)}), 500
 
 
-# @app.route("/api/course_sections", methods=["GET"])
-# def get_course_sections():
-#     conn = sqlite3.connect(DB_FILE)
-#     c = conn.cursor()
-#     c.execute("SELECT * FROM course_section")
-#     sections = c.fetchall()
-#     conn.close()
-#     return jsonify(sections)
-
-
-# @app.route("/api/teaching_assistants", methods=["GET"])
-# def get_teaching_assistants():
-#     conn = sqlite3.connect(DB_FILE)
-#     c = conn.cursor()
-#     c.execute("SELECT * FROM teaching_assistant")
-#     tas = c.fetchall()
-#     conn.close()
-#     return jsonify(tas)
-
-
-# @app.route("/api/office_hours", methods=["GET"])
-# def get_office_hours():
-#     conn = sqlite3.connect(DB_FILE)
-#     c = conn.cursor()
-#     c.execute("SELECT * FROM office_hour")
-#     office_hours = c.fetchall()
-#     conn.close()
-#     return jsonify(office_hours)
-
-
 if __name__ == "__main__":
     create_tables()
     # test_insertions()
