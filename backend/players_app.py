@@ -67,7 +67,7 @@ def add_player():
 
     # Insert player data into the database
     conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    cursor = conn.cursor(prepared=True)
     cursor.execute(
         """INSERT INTO Player (Name, PhoneNumber, Email, WinLossRatio, Amount) 
                    VALUES (?, ?, ?, ?, ?)""",
@@ -89,7 +89,7 @@ def update_player(player_id):
         amount = player_data["Amount"]
 
         conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
+        cursor = conn.cursor(prepared=True)
         cursor.execute(
             """
             UPDATE Player 

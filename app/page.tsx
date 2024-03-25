@@ -31,6 +31,7 @@ export default function Home() {
   });
   const [editMode, setEditMode] = useState(false);
   const [editPlayerId, setEditPlayerId] = useState<number | null>(null);
+  const [amountError, setAmountError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -76,9 +77,18 @@ export default function Home() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
+    let newValue = value;
+
+    if (name === 'Amount') {
+      newValue = newValue.replace(/[^\d.]/g, '');
+      newValue = newValue.replace(/^-/, ''); 
+      newValue = newValue.replace(/(\.\d\d)\d+$/, '$1');
+    }
+
     setNewPlayer(prevState => ({
       ...prevState,
-      [name]: value
+      [name]: newValue
     }));
   }
 
@@ -86,6 +96,11 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      if (newPlayer.Amount < 0) {
+        setAmountError('Amount must be non-negative');
+      } else {
+        setAmountError(null);
+      }
       if (editMode && editPlayerId) {
         // If edit mode is enabled, send a PUT request to update the player
         await axios.put(`http://localhost:3001/api/players/${editPlayerId}`, newPlayer);
@@ -201,15 +216,15 @@ export default function Home() {
           </div>
           <div className='mb-4'>
             <label htmlFor='phoneNumber' className='text-white'>Phone Number (Format: xxx-xxx-xxxx):</label>
-            <input type='tel' id='phoneNumber' name='PhoneNumber' pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}" value={newPlayer.PhoneNumber} onChange={handleInputChange} className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
+            <input type='tel' id='phoneNumber' name='PhoneNumber' pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}" value={newPlayer.PhoneNumber} onChange={handleInputChange} required className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
           </div>
           <div className='mb-4'>
             <label htmlFor='email' className='text-white'>Email:</label>
-            <input type='email' id='email' name='Email' value={newPlayer.Email} onChange={handleInputChange} className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
+            <input type='email' id='email' name='Email' value={newPlayer.Email} onChange={handleInputChange} required className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
           </div>
           <div className='mb-4'>
             <label htmlFor='amount' className='text-white'>Amount (USD):</label>
-            <input type='number' id='amount' name='Amount' value={newPlayer.Amount} onChange={handleInputChange} className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
+            <input type='number' id='amount' name='Amount' value={newPlayer.Amount} onChange={handleInputChange} required className='block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-900 focus:border-green-900' />
           </div>
           <button type='submit' className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'>{editMode ? 'Edit Player' : 'Add New Player'}</button>
         </form>
