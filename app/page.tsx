@@ -51,11 +51,8 @@ export default function Home() {
    * CONSTANTS FOR GAMES
    */
 
-  const [timestamp, setTimestamp] = useState('');
-  const [location, setLocation] = useState('');
   const [buyIns, setBuyIns] = useState<any>({});
   const [gameId, setGameId] = useState<number | null>(null);
-  const [showPopup, setShowPopup] = useState(false);
 
   const [showGameForm, setShowGameForm] = useState(false);
   const [gameLocation, setGameLocation] = useState('');
@@ -64,9 +61,21 @@ export default function Home() {
   const [showOutcomes, setShowOutcomes] = useState(false);
   const [outcomes, setOutcomes] = useState<{ [key: string]: number }>({});
 
+  /*
+   * CONSTANTS FOR FILTERS
+   */
+
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [uniqueLocations, setUniqueLocations] = useState([]);
+  const [winningPlayer, setWinningPlayer] = useState<string>('');
+
   useEffect(() => {
     fetchPlayers();
     fetchGames();
+    fetchUniqueLocations();
   }, []);
 
   /*
@@ -126,8 +135,9 @@ export default function Home() {
         // If edit mode is not enabled, send a POST request to add a new player
         await axios.post('http://localhost:3001/api/addPlayer', newPlayer);
       }
-      // Refresh the players list after adding or editing a player
+      // Refresh the players and games list after adding or editing a player
       fetchPlayers();
+      fetchGames();
       // Reset the form fields and edit mode
       cancelEdit();
     } catch (error) {
@@ -184,6 +194,7 @@ export default function Home() {
    * GAME STUFF
    */
 
+  // Fetches games from server
   const fetchGames = async () => {
     try {
       const response = await axios.get<Game[]>('http://localhost:3001/api/games');
@@ -203,28 +214,7 @@ export default function Home() {
     }
   }
 
-  const handleCheckboxChange = (playerId: number) => {
-    setBuyIns(prevState => ({
-      ...prevState,
-      [playerId]: prevState[playerId] === 0 ? 1 : 0
-    }));
-  }
-
-  const handleUpdate = async () => {
-    const playerLogs = Object.keys(buyIns).map(playerId => ({
-        PlayerID: parseInt(playerId),
-        BuyIn: buyIns[playerId],
-        Outcome: 0  // Placeholder, you can implement this part
-    }));
-
-    const gameLogData = {
-        GameID: gameId,
-        PlayerLogs: playerLogs
-    };
-
-    await axios.post('http://localhost:3001/api/updateGameLog', gameLogData);
-  }
-
+  // Checks which players are in the current game
   const handlePlayerSelect = (playerID: number) => {
     if (selectedPlayers.includes(playerID)) {
         setSelectedPlayers(prevState => prevState.filter(id => id !== playerID));
@@ -233,10 +223,12 @@ export default function Home() {
     }
 };
 
+  // Handles the buy ins for the players
   const handleBuyInChange = (playerID: number, amount: number) => {
       setBuyIns(prevState => ({ ...prevState, [playerID]: amount }));
   };
 
+  // Starts the game and server checks if the buy in amount is good
   const handleGameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -271,10 +263,10 @@ export default function Home() {
     }
   };
 
+  // Finishes the game and updates the tables necessary
   const handleOutcomeChange = (playerID: string, outcome: number) => {
     setOutcomes(prevState => ({ ...prevState, [playerID]: outcome }));
   };
-
   const handleUpdateOutcomes = async () => {
       // Prepare game data
       const outcomeData = {
@@ -290,6 +282,7 @@ export default function Home() {
         setShowOutcomes(false);
         fetchGames();
         fetchPlayers();
+        fetchUniqueLocations();
       } catch (error: any) {
         if (error.response.status = 404) {
           alert("Not zero sum!")
@@ -301,12 +294,45 @@ export default function Home() {
   };
 
   /*
+   * FILTERING
+   */
+
+  const fetchUniqueLocations = async () => {
+    try {
+        const response = await axios.get('http://localhost:3001/api/unique_locations');
+        setUniqueLocations(response.data);
+    } catch (error) {
+        console.error("Error fetching unique locations:", error);
+    }
+  };
+
+  const applyFilters = async () => {
+    // Prepare filter data
+    const filterData = {
+      startDate: startDate,
+      endDate: endDate,
+      location: selectedLocation,
+      winningPlayer: winningPlayer
+    };
+
+    try {
+      const response = await axios.post('http://localhost:3001/api/filter', filterData);
+
+    } catch (error: any) {
+      console.log(error);
+    }
+
+
+    setShowFilterModal(false);
+  };
+
+  /*
    * FORMATTING
    */
   const formatDateTime = (dateTime: string) => {
     const date = new Date(dateTime);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-  }
+  };
 
   const formatPrice = (amount: number) => {
     const num = amount;
@@ -315,28 +341,14 @@ export default function Home() {
     } else {
       return "$" + num;
     }
-  }
-
-  const toESTISOString = (date: Date) => {
-    const utcOffset = -5 * 60; // UTC offset in minutes for EST
-    const localOffset = date.getTimezoneOffset(); // Get local timezone offset in minutes
-    const utcTime = date.getTime() + (localOffset * 60 * 1000); // Convert to UTC
-    const estTime = utcTime + (utcOffset * 60 * 1000); // Adjust to EST
-
-    // Format the date-time to match 'datetime-local' input format
-    const formattedDateTime = new Date(estTime).toISOString().substring(0, 16);
-
-    // Convert UTC formatted datetime to local formatted datetime
-    const localFormattedDateTime = formattedDateTime.replace('Z', '');
-
-    return localFormattedDateTime;
-  }
+  };
 
   const handleGameDateTimeChange = (date: Date | null) => {
     if (date) {
         setGameDateTime(date);
     }
-  }
+  };
+
   
   /*
    * React HTML Return Statement
@@ -433,8 +445,13 @@ export default function Home() {
           <div>
             <button 
               onClick={() => setShowGameForm(true)} 
-              className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'>
+              className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline mr-4'>
               Start Game
+            </button>
+            <button 
+              onClick={() => setShowFilterModal(true)} 
+              className='bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline ml-4'>
+              Filter Games
             </button>
           </div>
         </div>
@@ -540,7 +557,68 @@ export default function Home() {
         </div>
     )}
 
-      </div>
+    {showFilterModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-green-900 text-white p-8 rounded-md w-full max-w-md">
+                <h3 className='text-xl font-semibold mb-4'>Filter Games</h3>
+                <div className='mb-4'>
+                    <label className='text-white'>Date Range:</label>
+                    <div className='flex'>
+                        <input 
+                            type="date" 
+                            value={startDate} 
+                            onChange={(e) => setStartDate(e.target.value)} 
+                            className='mr-2 bg-green-800 text-white px-4 py-2 rounded-md focus:outline-none focus:bg-green-700 focus:border-green-700' 
+                        />
+                        <input 
+                            type="date" 
+                            value={endDate} 
+                            onChange={(e) => setEndDate(e.target.value)} 
+                            className='bg-green-800 text-white px-4 py-2 rounded-md focus:outline-none focus:bg-green-700 focus:border-green-700' 
+                        />
+                    </div>
+                </div>
+                <div className='mb-4'>
+                  <label className="text-white">Location:</label>
+                  <select 
+                      value={selectedLocation} 
+                      onChange={(e) => setSelectedLocation(e.target.value)} 
+                      className='mr-2 block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-700 focus:border-green-700'
+                  >
+                      <option value="">All Locations</option>
+                      {uniqueLocations.map((location, index) => (
+                          <option key={index} value={location}>{location}</option>
+                      ))}
+                  </select>
+                </div>
+                <div className='mb-4'>
+                    <label className='text-white'>Winning Player:</label>
+                    <input 
+                        type="text" 
+                        value={winningPlayer} 
+                        onChange={(e) => setWinningPlayer(e.target.value)} 
+                        className='mr-2 block w-full px-4 py-2 rounded-md bg-green-800 text-white placeholder-gray-400 focus:outline-none focus:bg-green-700 focus:border-green-700'
+                    />
+                </div>
+                <div className='flex justify-end'>
+                    <button 
+                        onClick={applyFilters} 
+                        className='bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md mr-2 focus:outline-none focus:shadow-outline'
+                    >
+                        Apply Filters
+                    </button>
+                    <button 
+                        onClick={() => setShowFilterModal(false)} 
+                        className='bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    )}
+
+    </div>
       <footer className="bg-gray-700 text-white text-center py-4 mt-auto">
         Developed by Manas Bommakanti
       </footer>

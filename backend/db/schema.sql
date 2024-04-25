@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS Game (
     GameID INTEGER PRIMARY KEY AUTOINCREMENT,
     Timestamp TEXT NOT NULL,
     Location TEXT NOT NULL,
+    WinningPlayerID INTEGER,
     WinningPlayer TEXT,
     WinningAmount REAL
 );

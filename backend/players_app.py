@@ -13,6 +13,10 @@ DB_FILE = config["DATABASE"]["POKER_DB_REL_PATH"]
 app = Flask(__name__)
 CORS(app)
 
+"""
+PRE-LOAD FUNCTIONS
+"""
+
 
 def create_tables():
     conn = sqlite3.connect(DB_FILE)
@@ -35,6 +39,11 @@ def test_insertions():
 
     # conn.commit()
     conn.close()
+
+
+"""
+PLAYER FUNCTIONS
+"""
 
 
 @app.route("/api/players", methods=["GET"])
@@ -65,6 +74,132 @@ def get_players():
         conn.close()
 
 
+@app.route("/api/addPlayer", methods=["POST"])
+def add_player():
+    try:
+        player_data = request.json
+        name = player_data.get("Name")
+        phone_number = player_data.get("PhoneNumber")
+        email = player_data.get("Email")
+        amount = player_data.get("Amount")
+
+        # Insert player data into the database
+        conn = sqlite3.connect(DB_FILE)
+
+        cursor = conn.cursor()
+
+        # Set isolation level to READ UNCOMMITTED
+        cursor.execute("PRAGMA read_uncommitted = true;")
+
+        # Begin transaction
+        cursor.execute("BEGIN TRANSACTION;")
+
+        # Execute query
+        cursor.execute(
+            """INSERT INTO Player (Name, PhoneNumber, Email, Profit, Amount) 
+                        VALUES (?, ?, ?, ?, ?)""",
+            (name, phone_number, email, 0, amount),
+        )
+
+        # End transaction
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "Player added successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/players/<int:player_id>", methods=["PUT"])
+def update_player(player_id):
+    try:
+        player_data = request.json
+        name = player_data["Name"]
+        phone_number = player_data["PhoneNumber"]
+        email = player_data["Email"]
+        amount = player_data["Amount"]
+
+        conn = sqlite3.connect(DB_FILE)
+
+        cursor = conn.cursor()
+
+        # Set isolation level to READ UNCOMMITTED
+        cursor.execute("PRAGMA read_uncommitted = true;")
+
+        # Begin transaction
+        cursor.execute("BEGIN TRANSACTION;")
+
+        # Execute query
+        cursor.execute(
+            """
+            UPDATE Player 
+            SET Name=?, PhoneNumber=?, Email=?, Amount=?
+            WHERE PlayerID=?
+        """,
+            (name, phone_number, email, amount, player_id),
+        )
+
+        cursor.execute(
+            """
+            UPDATE Game
+            SET WinningPlayer = ?
+            WHERE WinningPlayerID = ?
+        """,
+            (name, player_id),
+        )
+
+        cursor.execute("COMMIT TRANSACTION;")
+
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "Player updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/players/<int:player_id>", methods=["DELETE"])
+def delete_player(player_id):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+
+        cursor = conn.cursor()
+
+        # Set isolation level to READ UNCOMMITTED
+        cursor.execute("PRAGMA read_uncommitted = true;")
+
+        # Start transaction
+        cursor.execute("BEGIN TRANSACTION;")
+
+        # Execute query
+        cursor.execute(
+            """
+            DELETE FROM Player WHERE PlayerID=?
+        """,
+            (player_id,),
+        )
+
+        cursor.execute("COMMIT TRANSACTION;")
+
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "Player deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+"""
+GAME FUNCTIONS
+"""
+
+
 @app.route("/api/games", methods=["GET"])
 def get_games():
     conn = sqlite3.connect(DB_FILE)
@@ -75,7 +210,6 @@ def get_games():
 
     c.execute("BEGIN TRANSACTION;")
 
-    # Get the player who won each game
     c.execute(
         f"""
             SELECT GameID AS GameID,
@@ -248,10 +382,15 @@ def update_game_log():
             cursor.execute(
                 f"""
                         UPDATE Game
-                        SET WinningPlayer = ?, WinningAmount = ?
+                        SET WinningPlayerID = ?, WinningPlayer = ?, WinningAmount = ?
                         WHERE GameID = ?;
                     """,
-                (winning_player[0], profits[winning_player_id], game_id),
+                (
+                    winning_player_id,
+                    winning_player[0],
+                    profits[winning_player_id],
+                    game_id,
+                ),
             )
 
             cursor.execute("COMMIT TRANSACTION;")
@@ -274,116 +413,37 @@ def update_game_log():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/addPlayer", methods=["POST"])
-def add_player():
-    try:
-        player_data = request.json
-        name = player_data.get("Name")
-        phone_number = player_data.get("PhoneNumber")
-        email = player_data.get("Email")
-        amount = player_data.get("Amount")
-
-        # Insert player data into the database
-        conn = sqlite3.connect(DB_FILE)
-
-        cursor = conn.cursor()
-
-        # Set isolation level to READ UNCOMMITTED
-        cursor.execute("PRAGMA read_uncommitted = true;")
-
-        # Begin transaction
-        cursor.execute("BEGIN TRANSACTION;")
-
-        # Execute query
-        cursor.execute(
-            """INSERT INTO Player (Name, PhoneNumber, Email, Profit, Amount) 
-                        VALUES (?, ?, ?, ?, ?)""",
-            (name, phone_number, email, 0, amount),
-        )
-
-        # End transaction
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({"message": "Player added successfully"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+"""
+FILTERING FUNCTIONS
+"""
 
 
-@app.route("/api/players/<int:player_id>", methods=["PUT"])
-def update_player(player_id):
-    try:
-        player_data = request.json
-        name = player_data["Name"]
-        phone_number = player_data["PhoneNumber"]
-        email = player_data["Email"]
-        amount = player_data["Amount"]
+@app.route("/api/unique_locations", methods=["GET"])
+def get_unique_locations():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
 
-        conn = sqlite3.connect(DB_FILE)
+    # Set isolation level to READ UNCOMMITTED
+    c.execute("PRAGMA read_uncommitted = true;")
 
-        cursor = conn.cursor()
+    c.execute("BEGIN TRANSACTION;")
 
-        # Set isolation level to READ UNCOMMITTED
-        cursor.execute("PRAGMA read_uncommitted = true;")
+    c.execute("SELECT DISTINCT Location FROM Game;")
+    unique_locations = c.fetchall()
 
-        # Begin transaction
-        cursor.execute("BEGIN TRANSACTION;")
+    c.execute("COMMIT TRANSACTION;")
 
-        # Execute query
-        cursor.execute(
-            """
-            UPDATE Player 
-            SET Name=?, PhoneNumber=?, Email=?, Amount=?
-            WHERE PlayerID=?
-        """,
-            (name, phone_number, email, amount, player_id),
-        )
+    c.close()
+    conn.close()
 
-        cursor.execute("COMMIT TRANSACTION;")
-
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({"message": "Player updated successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(unique_locations)
 
 
-@app.route("/api/players/<int:player_id>", methods=["DELETE"])
-def delete_player(player_id):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-
-        cursor = conn.cursor()
-
-        # Set isolation level to READ UNCOMMITTED
-        cursor.execute("PRAGMA read_uncommitted = true;")
-
-        # Start transaction
-        cursor.execute("BEGIN TRANSACTION;")
-
-        # Execute query
-        cursor.execute(
-            """
-            DELETE FROM Player WHERE PlayerID=?
-        """,
-            (player_id,),
-        )
-
-        cursor.execute("COMMIT TRANSACTION;")
-
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({"message": "Player deleted successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route("/api/filter", methods=["POST"])
+def filter():
+    filter_data = request.json
+    print("DATA:")
+    print(filter_data)
 
 
 if __name__ == "__main__":
