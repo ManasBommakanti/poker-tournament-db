@@ -445,6 +445,70 @@ def filter():
     print("DATA:")
     print(filter_data)
 
+    startDate = filter_data.get("startDate")
+    endDate = filter_data.get("endDate")
+    location = filter_data.get("location")
+    winningPlayer = filter_data.get("winningPlayer")
+
+    query = ""
+
+    final_tuple = []
+
+    if startDate != "":
+        query += " AND DATE(Timestamp) >= ?"
+        final_tuple.append(startDate)
+    if endDate != "":
+        query += " AND DATE(Timestamp) <= ?"
+        final_tuple.append(endDate)
+    if location != "":
+        query += " AND Location = ?"
+        final_tuple.append(location)
+    if winningPlayer != "":
+        query += " AND WinningPlayer = ?"
+        final_tuple.append(winningPlayer)
+
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+
+    # Set isolation level to READ UNCOMMITTED
+    c.execute("PRAGMA read_uncommitted = true;")
+
+    c.execute("BEGIN TRANSACTION;")
+
+    gameQuery = """
+        SELECT GameID AS GameID,
+            Timestamp AS Time,
+            Location AS Location,
+            WinningPlayer AS PlayerName,
+            WinningAmount
+        FROM Game
+        WHERE 1 = 1
+    """
+
+    gameQuery += query
+
+    c.execute(gameQuery, tuple(final_tuple))
+    games = c.fetchall()
+
+    statQuery = """
+        SELECT AVG(WinningAmount) AS AvgWinnings,
+            COUNT(*) AS NumGames
+        FROM Game
+        WHERE 1 = 1
+    """
+
+    statQuery += query
+
+    c.execute(statQuery, tuple(final_tuple))
+    stats = c.fetchall()
+
+    c.execute("COMMIT TRANSACTION;")
+
+    c.close()
+    conn.close()
+
+    return jsonify({"games": games, "stats": stats})
+
 
 if __name__ == "__main__":
     create_tables()

@@ -28,13 +28,17 @@ interface Game {
   WinningAmount: number;
 }
 
+interface Stats {
+  AvgWinnings: number,
+  CountPlayers: number
+}
+
 export default function Home() {
   /*
    * CONSTANTS FOR PLAYERS
    */
 
   const [players, setPlayers] = useState<Player[]>([]);
-  const [games, setGames] = useState<Game[]>([]);
   const [newPlayer, setNewPlayer] = useState<Player>({
     PlayerID: 0,
     Name: '',
@@ -51,6 +55,7 @@ export default function Home() {
    * CONSTANTS FOR GAMES
    */
 
+  const [games, setGames] = useState<Game[]>([]);
   const [buyIns, setBuyIns] = useState<any>({});
   const [gameId, setGameId] = useState<number | null>(null);
 
@@ -71,6 +76,8 @@ export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [uniqueLocations, setUniqueLocations] = useState([]);
   const [winningPlayer, setWinningPlayer] = useState<string>('');
+  const [filteredGames, setFilteredGames] = useState<Game[]>([]);
+  const [stats, setStats] = useState<Stats[]>([]);
 
   useEffect(() => {
     fetchPlayers();
@@ -263,7 +270,7 @@ export default function Home() {
     }
   };
 
-  // Finishes the game and updates the tables necessary
+  // Finishes the game, updates the tables necessary and app
   const handleOutcomeChange = (playerID: string, outcome: number) => {
     setOutcomes(prevState => ({ ...prevState, [playerID]: outcome }));
   };
@@ -318,6 +325,26 @@ export default function Home() {
     try {
       const response = await axios.post('http://localhost:3001/api/filter', filterData);
 
+      console.log(response.data);
+
+      const mappedGames: Game[] = response.data.games.map((gameData: any) => ({
+        GameID: gameData[0],
+        Time: gameData[1],
+        Location: gameData[2],
+        PlayerWon: gameData[3],
+        WinningAmount: gameData[4]
+      }));
+
+      const mappedStats: Stats[] = response.data.stats.map((statsData: any) => ({
+        AvgWinnings: statsData[0],
+        CountPlayers: statsData[1]
+      }))
+
+      setFilteredGames(mappedGames);
+      setStats(mappedStats);
+
+      console.log("stats: " + stats);
+
     } catch (error: any) {
       console.log(error);
     }
@@ -325,6 +352,12 @@ export default function Home() {
 
     setShowFilterModal(false);
   };
+
+  const handleFilterClose = () => {
+    setFilteredGames([]);
+    setStats([]);
+    setShowFilterModal(false);
+  }
 
   /*
    * FORMATTING
@@ -556,6 +589,57 @@ export default function Home() {
             </div>
         </div>
     )}
+
+    {filteredGames.length > 0 && (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div className="bg-green-900 p-8 rounded-md w-full max-w-xl shadow-lg">
+          <h3 className='text-2xl font-semibold mb-4 text-white'>Filtered Games</h3>
+          
+          {/* Filtered Games Table */}
+          <div className='mb-4 overflow-x-auto rounded-md'>
+            <table className='table-auto w-full'>
+              <thead>
+                <tr className='bg-green-800 text-white'>
+                  <th className='px-4 py-2'>Time</th>
+                  <th className='px-4 py-2'>Location</th>
+                  <th className='px-4 py-2'>Winning Player</th>
+                  <th className='px-4 py-2'>Winning Amount</th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-green-800'>
+                {filteredGames.map(game => (
+                  <tr key={game.GameID} className='text-center'>
+                    <td className='px-4 py-2'>{formatDateTime(game.Time)}</td>
+                    <td className='px-4 py-2'>{game.Location}</td>
+                    <td className='px-4 py-2'>{game.PlayerWon}</td>
+                    <td className='px-4 py-2'>{formatPrice(game.WinningAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Stats */}
+          {stats && (
+            <div className='mb-4 text-white'>
+              <h4 className='text-lg font-semibold mb-2'>Stats</h4>
+              <p>Average Winnings: {formatPrice(stats[0].AvgWinnings)}</p>
+              <p>Number of Games: {stats[0].CountPlayers}</p>
+            </div>
+          )}
+
+          <div className='flex justify-end'>
+            <button 
+              onClick={handleFilterClose} 
+              className='bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
 
     {showFilterModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
