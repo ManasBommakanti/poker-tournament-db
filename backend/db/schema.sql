@@ -25,3 +25,5 @@ CREATE TABLE IF NOT EXISTS GameLog (
     FOREIGN KEY (PlayerID) REFERENCES Player(PlayerID),
     FOREIGN KEY (GameID) REFERENCES Game(GameID)
 );
+
+CREATE INDEX IF NOT EXISTS idx_date_range ON Game(Timestamp);
