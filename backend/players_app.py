@@ -29,18 +29,6 @@ def create_tables():
     conn.close()
 
 
-# used to test insertions into table
-def test_insertions():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-
-    with open(os.path.realpath("db/insertions.sql"), "r") as f:
-        c.executescript(f.read())
-
-    # conn.commit()
-    conn.close()
-
-
 """
 PLAYER FUNCTIONS
 """
@@ -251,12 +239,10 @@ def start_game():
     cursor.execute("BEGIN TRANSACTION;")
 
     # Insert new game
-    cursor.execute(
-        "INSERT INTO Game (Timestamp, Location) VALUES (?, ?)",
-        (timestamp, location),
-    )
-
-    game_id = cursor.lastrowid
+    # cursor.execute(
+    #     "INSERT INTO Game (Timestamp, Location) VALUES (?, ?)",
+    #     (timestamp, location),
+    # )
 
     players = dict()
     commit = True
@@ -284,13 +270,7 @@ def start_game():
         conn.close()
 
         return (
-            jsonify(
-                {
-                    "message": "Game started successfully",
-                    "GameID": game_id,
-                    "PlayerBuyIns": players,
-                }
-            ),
+            jsonify({"message": "Game started successfully"}),
             200,
         )
     else:
@@ -306,111 +286,117 @@ def start_game():
 @app.route("/api/updateOutcomes", methods=["POST"])
 def update_game_log():
     game_data = request.json
-    game_id = game_data.get("game_id")
-    print("game_id: ", game_id)
     outcomes = game_data.get("outcomes")
     buyins = game_data.get("buyIns")
+    timestamp = game_data.get("timestamp")
+    location = game_data.get("location")
 
-    try:
-        conn = sqlite3.connect(DB_FILE)
+    # try:
+    conn = sqlite3.connect(DB_FILE)
 
-        cursor = conn.cursor()
+    cursor = conn.cursor()
 
-        # Set isolation level to READ UNCOMMITTED
-        cursor.execute("PRAGMA read_uncommitted = true;")
+    # Set isolation level to READ UNCOMMITTED
+    cursor.execute("PRAGMA read_uncommitted = true;")
 
-        # Begin transaction
-        cursor.execute("BEGIN TRANSACTION;")
+    # Begin transaction
+    cursor.execute("BEGIN TRANSACTION;")
 
-        zero_sum = 0
-        game_log_updates = []
+    # Insert new game
+    cursor.execute(
+        "INSERT INTO Game (Timestamp, Location) VALUES (?, ?)",
+        (timestamp, location),
+    )
 
-        for player_id, outcome in outcomes.items():
-            buy_in = buyins[player_id]
+    game_id = cursor.lastrowid
 
-            game_log_updates.append([player_id, buy_in, outcome])
+    zero_sum = 0
+    game_log_updates = []
+
+    for player_id, outcome in outcomes.items():
+        buy_in = buyins[player_id]
+
+        game_log_updates.append([player_id, buy_in, outcome])
+
+        game_profit = outcome - buy_in
+        zero_sum += game_profit
+
+    if zero_sum == 0:
+        buy_in = buyins[player_id]
+
+        profits = {}
+
+        for g in game_log_updates:
+            player_id = g[0]
+            buy_in = g[1]
+            outcome = g[2]
+
+            cursor.execute(
+                """
+                    INSERT INTO GameLog (PlayerID, GameID, BuyIn, Outcome)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                (player_id, game_id, buy_in, outcome),
+            )
+
+            cursor.execute(
+                "SELECT Profit, Amount FROM Player WHERE PlayerID = ?", player_id
+            )
+
+            items = cursor.fetchone()
+            profit = items[0]
+            amount = items[1]
 
             game_profit = outcome - buy_in
-            zero_sum += game_profit
+            profits[player_id] = game_profit
 
-        if zero_sum == 0:
-            buy_in = buyins[player_id]
-
-            profits = {}
-
-            for g in game_log_updates:
-                player_id = g[0]
-                buy_in = g[1]
-                outcome = g[2]
-
-                cursor.execute(
-                    """
-                        INSERT INTO GameLog (PlayerID, GameID, BuyIn, Outcome)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                    (player_id, game_id, buy_in, outcome),
-                )
-
-                cursor.execute(
-                    "SELECT Profit, Amount FROM Player WHERE PlayerID = ?", player_id
-                )
-
-                items = cursor.fetchone()
-                profit = items[0]
-                amount = items[1]
-
-                game_profit = outcome - buy_in
-                profits[player_id] = game_profit
-
-                # Execute query
-                cursor.execute(
-                    """
-                        UPDATE Player 
-                        SET Profit = ?, Amount=?
-                        WHERE PlayerID = ?
-                    """,
-                    (profit + game_profit, amount + game_profit, player_id),
-                )
-
-            winning_player_id = max(profits, key=profits.get)
-
+            # Execute query
             cursor.execute(
-                "SELECT Name FROM Player WHERE PlayerID = ?", (winning_player_id)
-            )
-            winning_player = cursor.fetchone()
-
-            cursor.execute(
-                f"""
-                        UPDATE Game
-                        SET WinningPlayerID = ?, WinningPlayer = ?, WinningAmount = ?
-                        WHERE GameID = ?;
-                    """,
-                (
-                    winning_player_id,
-                    winning_player[0],
-                    profits[winning_player_id],
-                    game_id,
-                ),
+                """
+                    UPDATE Player 
+                    SET Profit = ?, Amount=?
+                    WHERE PlayerID = ?
+                """,
+                (profit + game_profit, amount + game_profit, player_id),
             )
 
-            cursor.execute("COMMIT TRANSACTION;")
-            conn.commit()
+        winning_player_id = max(profits, key=profits.get)
 
-            cursor.close()
-            conn.close()
+        cursor.execute(
+            "SELECT Name FROM Player WHERE PlayerID = ?", (winning_player_id)
+        )
+        winning_player = cursor.fetchone()
 
-            return jsonify({"message": "Game log updated successfully"}), 200
-        else:
-            cursor.execute("ROLLBACK;")
-            conn.commit()
+        cursor.execute(
+            f"""
+                    UPDATE Game
+                    SET WinningPlayerID = ?, WinningPlayer = ?, WinningAmount = ?
+                    WHERE GameID = ?;
+                """,
+            (
+                winning_player_id,
+                winning_player[0],
+                profits[winning_player_id],
+                game_id,
+            ),
+        )
 
-            cursor.close()
-            conn.close()
+        cursor.execute("COMMIT TRANSACTION;")
+        conn.commit()
 
-            return "Not zero sum", 404
+        cursor.close()
+        conn.close()
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"message": "Game log updated successfully"}), 200
+    else:
+        print(zero_sum)
+        cursor.execute("ROLLBACK;")
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return "Not zero sum", 404
 
 
 """
@@ -512,5 +498,4 @@ def filter():
 
 if __name__ == "__main__":
     create_tables()
-    # test_insertions()
     app.run(debug=True, port=3001)

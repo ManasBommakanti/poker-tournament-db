@@ -59,6 +59,7 @@ export default function Home() {
   const [buyIns, setBuyIns] = useState<any>({});
   const [gameId, setGameId] = useState<number | null>(null);
 
+  const [totalBuyIn, setTotalBuyIn] = useState<number>(0);
   const [showGameForm, setShowGameForm] = useState(false);
   const [gameLocation, setGameLocation] = useState('');
   const [gameDateTime, setGameDateTime] = useState<Date>(new Date());
@@ -250,6 +251,7 @@ export default function Home() {
         location: gameLocation,
         buyIns: Object.entries(buyIns).map(([playerID, buyIn]) => ({ playerID, buyIn })),
     };
+    
 
     try {
         // Send game data to the server
@@ -259,11 +261,12 @@ export default function Home() {
         setShowGameForm(false);
         setShowOutcomes(true);
 
-        setGameId(status.data.GameID)
-        setBuyIns(status.data.PlayerBuyIns);
+        // setGameId(status.data.GameID)
+        const sum = Object.values(buyIns).reduce((acc, value) => (acc + value), 0)
+        setTotalBuyIn(sum);
     } catch (error: any) {
       if (error.response.status == 404) {
-        alert("One of the players has a buy in higher than current amount!")
+        alert("At least one of the players has a buy in higher than current amount!")
       } else {
         console.error('Error starting game:', error);
       }
@@ -277,10 +280,12 @@ export default function Home() {
   const handleUpdateOutcomes = async () => {
       // Prepare game data
       const outcomeData = {
-        game_id: gameId,
         outcomes: outcomes,
-        buyIns: buyIns
+        timestamp: gameDateTime?.toISOString(),
+        location: gameLocation,
+        buyIns: buyIns,
       };
+
       try {
         // Send outcomes data to the server
         await axios.post('http://localhost:3001/api/updateOutcomes', outcomeData);
@@ -290,6 +295,8 @@ export default function Home() {
         fetchGames();
         fetchPlayers();
         fetchUniqueLocations();
+        setBuyIns({});
+        setOutcomes({});
       } catch (error: any) {
         if (error.response.status = 404) {
           alert("Not zero sum!")
@@ -438,8 +445,8 @@ export default function Home() {
         </div>
       </div>
       <div className='mx-auto text-white p-4 flex flex-wrap w-full'>
+      {/* Player Insertion Form */}
       <div className='w-full lg:w-1/2 lg:pr'>
-        {/* Player Insertion Form */}
         <h2 className='text-xl font-semibold mb-4 text-white'>{editMode ? 'Edit Player' : 'Add New Player'}</h2>
         <form autoComplete="off" onSubmit={handleSubmit}>
           <div className='mb-4'>
@@ -461,6 +468,7 @@ export default function Home() {
           <button type='submit' className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'>{editMode ? 'Edit Player' : 'Add New Player'}</button>
         </form>
       </div>
+      {/* Game Table */}
       <div className='w-full lg:w-1/2 lg:pl-10'>
           <h2 className='text-2xl font-semibold mb-4'>Games</h2>
           <div className='overflow-x-auto rounded-md'>
@@ -486,6 +494,7 @@ export default function Home() {
             </table>
           </div>
           <div className='mb-4'></div>
+          {/* Game Buttons */}
           <div>
             <button 
               onClick={() => setShowGameForm(true)} 
@@ -574,6 +583,9 @@ export default function Home() {
     {showOutcomes && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-green-900 text-white p-8 rounded-md w-full max-w-md">
+            <div className='pb-4'>
+              <label className='text-white'>Total Pot: {formatPrice(totalBuyIn)}</label> 
+            </div>
                 <h3 className='text-2xl font-semibold mb-4'>Enter Outcomes</h3>
                 {players
                   .filter(player => selectedPlayers.includes(player.PlayerID))
@@ -594,7 +606,7 @@ export default function Home() {
                         onClick={handleUpdateOutcomes} 
                         className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md mr-2 focus:outline-none focus:shadow-outline'
                     >
-                        Update
+                        Finish Game
                     </button>
                 </div>
             </div>
