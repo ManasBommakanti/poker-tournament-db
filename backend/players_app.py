@@ -78,16 +78,13 @@ def get_games():
     # Get the player who won each game
     c.execute(
         f"""
-                         SELECT g.GameID AS GameID,
-                            g.Timestamp AS Time,
-                            g.Location AS Location,
-                            p.Name AS PlayerName,
-                            MAX(gl.Outcome - gl.BuyIn)
-                         FROM Player p
-                         INNER JOIN GameLog gl ON p.PlayerID = gl.PlayerID
-                         INNER JOIN Game g ON g.GameID = gl.GameID
-                         GROUP BY g.GameID;        
-    """
+            SELECT GameID AS GameID,
+                Timestamp AS Time,
+                Location AS Location,
+                WinningPlayer AS PlayerName,
+                WinningAmount
+            FROM Game;        
+        """
     )
 
     playerWins = c.fetchall()
@@ -106,6 +103,8 @@ def start_game():
     timestamp = game_data.get("timestamp")
     location = game_data.get("location")
     buy_ins = game_data.get("buyIns")
+
+    print(buy_ins)
 
     conn = sqlite3.connect(DB_FILE)
 
@@ -132,8 +131,6 @@ def start_game():
     for dic in buy_ins:
         player_id = dic["playerID"]
         buy_in = dic["buyIn"]
-        print("player_id: ", player_id)
-        print("type(player): ", type(player_id))
 
         cursor.execute("SELECT Amount FROM Player WHERE PlayerID = ?", (player_id))
         curr_amount = cursor.fetchone()
@@ -145,10 +142,6 @@ def start_game():
 
     if commit:
         print(players)
-        # for thing in players:
-        #     cursor.execute(
-        #         "INSERT INTO GameLog (PlayerID, GameID, BuyIn) VALUES (?, ?, ?)", thing
-        #     )
 
         cursor.execute("COMMIT TRANSACTION;")
         conn.commit()
@@ -178,64 +171,107 @@ def start_game():
 
 @app.route("/api/updateOutcomes", methods=["POST"])
 def update_game_log():
-    # try:
     game_data = request.json
     game_id = game_data.get("game_id")
+    print("game_id: ", game_id)
     outcomes = game_data.get("outcomes")
     buyins = game_data.get("buyIns")
 
-    conn = sqlite3.connect(DB_FILE)
+    try:
+        conn = sqlite3.connect(DB_FILE)
 
-    cursor = conn.cursor()
+        cursor = conn.cursor()
 
-    # Set isolation level to READ UNCOMMITTED
-    cursor.execute("PRAGMA read_uncommitted = true;")
+        # Set isolation level to READ UNCOMMITTED
+        cursor.execute("PRAGMA read_uncommitted = true;")
 
-    # Begin transaction
-    cursor.execute("BEGIN TRANSACTION;")
+        # Begin transaction
+        cursor.execute("BEGIN TRANSACTION;")
 
-    for player_id, outcome in outcomes.items():
-        buy_in = buyins[player_id]
+        zero_sum = 0
+        game_log_updates = []
 
-        cursor.execute(
-            """
-            INSERT INTO GameLog (PlayerID, GameID, BuyIn, Outcome)
-            VALUES (?, ?, ?, ?)
-            """,
-            (player_id, game_id, buy_in, outcome),
-        )
+        for player_id, outcome in outcomes.items():
+            buy_in = buyins[player_id]
 
-        game_profit = outcome - buy_in
-        cursor.execute(
-            "SELECT Profit, Amount FROM Player WHERE PlayerID = ?", player_id
-        )
+            game_log_updates.append([player_id, buy_in, outcome])
 
-        items = cursor.fetchone()
-        profit = items[0]
-        amount = items[1]
+            game_profit = outcome - buy_in
+            zero_sum += game_profit
 
-        # Execute query
-        cursor.execute(
-            """
-            UPDATE Player 
-            SET Profit = ?, Amount=?
-            WHERE PlayerID=?
-        """,
-            (profit + game_profit, amount + game_profit, player_id),
-        )
+        if zero_sum == 0:
+            buy_in = buyins[player_id]
 
-    cursor.execute("COMMIT TRANSACTION;")
+            profits = {}
 
-    conn.commit()
+            for g in game_log_updates:
+                player_id = g[0]
+                buy_in = g[1]
+                outcome = g[2]
 
-    cursor.close()
-    conn.close()
+                cursor.execute(
+                    """
+                        INSERT INTO GameLog (PlayerID, GameID, BuyIn, Outcome)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                    (player_id, game_id, buy_in, outcome),
+                )
 
-    return jsonify({"message": "Game log updated successfully"})
+                cursor.execute(
+                    "SELECT Profit, Amount FROM Player WHERE PlayerID = ?", player_id
+                )
 
+                items = cursor.fetchone()
+                profit = items[0]
+                amount = items[1]
 
-# except Exception as e:
-#  return jsonify({"error": str(e)}), 500
+                game_profit = outcome - buy_in
+                profits[player_id] = game_profit
+
+                # Execute query
+                cursor.execute(
+                    """
+                        UPDATE Player 
+                        SET Profit = ?, Amount=?
+                        WHERE PlayerID = ?
+                    """,
+                    (profit + game_profit, amount + game_profit, player_id),
+                )
+
+            winning_player_id = max(profits, key=profits.get)
+
+            cursor.execute(
+                "SELECT Name FROM Player WHERE PlayerID = ?", (winning_player_id)
+            )
+            winning_player = cursor.fetchone()
+
+            cursor.execute(
+                f"""
+                        UPDATE Game
+                        SET WinningPlayer = ?, WinningAmount = ?
+                        WHERE GameID = ?;
+                    """,
+                (winning_player[0], profits[winning_player_id], game_id),
+            )
+
+            cursor.execute("COMMIT TRANSACTION;")
+            conn.commit()
+
+            cursor.close()
+            conn.close()
+
+            return jsonify({"message": "Game log updated successfully"}), 200
+        else:
+            cursor.execute("ROLLBACK;")
+            conn.commit()
+
+            cursor.close()
+            conn.close()
+
+            return "Not zero sum", 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/addPlayer", methods=["POST"])

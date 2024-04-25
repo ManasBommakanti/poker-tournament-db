@@ -25,6 +25,7 @@ interface Game {
   Time: string;
   Location: string;
   PlayerWon: string;
+  WinningAmount: number;
 }
 
 export default function Home() {
@@ -191,7 +192,8 @@ export default function Home() {
         GameID: gameData[0],
         Time: gameData[1],
         Location: gameData[2],
-        PlayerWon: gameData[3]
+        PlayerWon: gameData[3],
+        WinningAmount: gameData[4]
     }));
 
     setGames(mappedGames);
@@ -238,6 +240,11 @@ export default function Home() {
   const handleGameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (selectedPlayers.length <= 1) {
+      alert("Two players required to start game!")
+      return;
+    }
+
     // Prepare game data
     const gameData = {
         timestamp: gameDateTime?.toISOString(),
@@ -250,20 +257,17 @@ export default function Home() {
         const status = await axios.post('http://localhost:3001/api/startGame', gameData);
 
         console.log("STATUS: ", status)
-        if (status.status == 200) {
-          // After successful submission, show outcomes popup
-          setShowGameForm(false);
-          setShowOutcomes(true);
+        setShowGameForm(false);
+        setShowOutcomes(true);
 
-          setGameId(status.data.GameID)
-          setBuyIns(status.data.PlayerBuyIns);
-
-        } else if (status.status == 404) {
-          alert("One of the players has a buy in higher than current amount!")
-        }
-    } catch (error) {
+        setGameId(status.data.GameID)
+        setBuyIns(status.data.PlayerBuyIns);
+    } catch (error: any) {
+      if (error.response.status == 404) {
+        alert("One of the players has a buy in higher than current amount!")
+      } else {
         console.error('Error starting game:', error);
-        // Handle error, e.g., show error message to the user
+      }
     }
   };
 
@@ -279,16 +283,20 @@ export default function Home() {
         buyIns: buyIns
       };
       try {
-          // Send outcomes data to the server
-          await axios.post('http://localhost:3001/api/updateOutcomes', outcomeData);
+        // Send outcomes data to the server
+        await axios.post('http://localhost:3001/api/updateOutcomes', outcomeData);
 
-          // Close outcomes popup
-          setShowOutcomes(false);
-          fetchGames();
-          fetchPlayers();
-      } catch (error) {
+        // Close outcomes popup
+        setShowOutcomes(false);
+        fetchGames();
+        fetchPlayers();
+      } catch (error: any) {
+        if (error.response.status = 404) {
+          alert("Not zero sum!")
+        } else {
           console.error('Error updating outcomes:', error);
-          // Handle error, e.g., show error message to the user
+        }
+        // Handle error, e.g., show error message to the user
       }
   };
 
@@ -406,6 +414,7 @@ export default function Home() {
                   <th className='px-4 py-2'>Time</th>
                   <th className='px-4 py-2'>Location</th>
                   <th className='px-4 py-2'>Winning Player</th>
+                  <th className='px-4 py-2'>Winning Amount</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-green-800'>
@@ -414,6 +423,7 @@ export default function Home() {
                     <td className='px-4 py-2 text-center'>{formatDateTime(game.Time)}</td>
                     <td className='px-4 py-2 text-center'>{game.Location}</td>
                     <td className='px-4 py-2 text-center'>{game.PlayerWon}</td>
+                    <td className='px-4 py-2 text-center'>{formatPrice(game.WinningAmount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -504,7 +514,9 @@ export default function Home() {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-green-900 text-white p-8 rounded-md w-full max-w-md">
                 <h3 className='text-2xl font-semibold mb-4'>Enter Outcomes</h3>
-                {players.map((player: any) => (
+                {players
+                  .filter(player => selectedPlayers.includes(player.PlayerID))
+                  .map((player: any) => (
                     <div key={player.PlayerID} className='mb-4 flex items-center'>
                         <label className='text-white'>{player.Name} Outcome:</label>
                         <input 
@@ -522,12 +534,6 @@ export default function Home() {
                         className='bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md mr-2 focus:outline-none focus:shadow-outline'
                     >
                         Update
-                    </button>
-                    <button 
-                        onClick={() => setShowOutcomes(false)} 
-                        className='bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline'
-                    >
-                        Close
                     </button>
                 </div>
             </div>

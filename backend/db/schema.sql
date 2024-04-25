@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS Player (
 CREATE TABLE IF NOT EXISTS Game (
     GameID INTEGER PRIMARY KEY AUTOINCREMENT,
     Timestamp TEXT NOT NULL,
-    Location TEXT NOT NULL
+    Location TEXT NOT NULL,
+    WinningPlayer TEXT,
+    WinningAmount REAL
 );
 
 CREATE TABLE IF NOT EXISTS GameLog (
