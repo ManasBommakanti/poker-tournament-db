@@ -335,13 +335,24 @@ export default function Home() {
         WinningAmount: gameData[4]
       }));
 
+      if (mappedGames.length > 0) {
+        setFilteredGames(mappedGames);
+      }
+
       const mappedStats: Stats[] = response.data.stats.map((statsData: any) => ({
         AvgWinnings: statsData[0],
         CountPlayers: statsData[1]
       }))
 
-      setFilteredGames(mappedGames);
-      setStats(mappedStats);
+      if (mappedGames.length == 0) {
+        const mappedS: Stats[] = [{
+          AvgWinnings: 0,
+          CountPlayers: 0
+        }]
+        setStats(mappedS);
+      } else {
+        setStats(mappedStats);
+      }
 
       console.log("stats: " + stats);
 
@@ -368,7 +379,7 @@ export default function Home() {
   };
 
   const formatPrice = (amount: number) => {
-    const num = amount;
+    const num = Math.round(amount * 100) / 100;
     if (num < 0) {
       return "-$" + -num;
     } else {
@@ -590,7 +601,7 @@ export default function Home() {
         </div>
     )}
 
-    {filteredGames.length > 0 && (
+    {(filteredGames.length > 0 || stats.length > 0) && (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
         <div className="bg-green-900 p-8 rounded-md w-full max-w-xl shadow-lg">
           <h3 className='text-2xl font-semibold mb-4 text-white'>Filtered Games</h3>
